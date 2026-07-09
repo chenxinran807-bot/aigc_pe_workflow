@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI 试穿 Badcase 复跑台</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>AI 试穿 Prompt 自优化台</h1>
+          <p id="status">按问题簇定位高频 badcase，统一改 prompt，复跑后观察问题占比变化。</p>
+        </div>
+        <div class="actions">
+          <div class="action-group" data-action-scope="optimize inspect overview">
+            <span class="action-group-label">Prompt</span>
+            <button id="loadPromptsBtn" type="button" title="从 Coze 读取当前 Prompt">📥 读取</button>
+            <button id="applyPromptsBtn" type="button" title="将修改后的 Prompt 应用到 Coze">📤 应用</button>
+          </div>
+          <div class="action-group" data-action-scope="optimize inspect overview">
+            <span class="action-group-label">复跑</span>
+            <label class="run-count-control">
+              次数
+              <input id="runCount" type="number" min="1" max="20" value="4">
+            </label>
+            <button id="runSelectedBtn" type="button" class="primary">▶ 复跑当前</button>
+            <button id="runCheckedBtn" type="button" class="primary">▶ 复跑勾选</button>
+          </div>
+          <div class="action-group" data-action-scope="overview inspect optimize">
+            <span class="action-group-label">选择</span>
+            <button id="selectFilteredTopBtn" type="button">☑️ 全选筛选</button>
+            <button id="clearCheckedTopBtn" type="button">❌ 清空勾选</button>
+            <button id="rerunFailedCheckedBtn" type="button">🔄 重跑失败</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="experiment-row" data-panel-scope="overview inspect optimize">
+        <label>
+          实验
+          <select id="experimentSelect">
+            <option value="">表格工作台</option>
+          </select>
+        </label>
+        <label>
+          实验主题
+          <input id="experimentTheme" placeholder="例如：发型负向约束验证 v1">
+        </label>
+        <label>
+          总样本量
+          <input id="totalSampleSize" type="number" min="1" placeholder="占比分母">
+        </label>
+        <label class="experiment-cases experiment-manual-cases">
+          手动 Case（每行：user_image_url, outfit_image_url, ai_content_url, 输出列JSON）
+          <textarea id="manualCasesInput" class="short" placeholder='https://...user.jpg, https://...outfit.jpg, https://...ai-content.jpg, {"content":"https://...png","prompt":"...","vlm_result":{"user_vlm":{},"outfit_vlm":{}}}'></textarea>
+        </label>
+        <div class="experiment-actions">
+          <button id="createExperimentBtn" type="button" class="primary">✚ 创建</button>
+          <button id="saveExperimentBtn" type="button">💾 保存</button>
+          <button id="exportExperimentBtn" type="button">📥 导出</button>
+          <button id="deleteExperimentBtn" type="button" class="danger">🗑️ 删除</button>
+        </div>
+      </section>
+
+      <section class="load-row" data-panel-scope="overview inspect optimize">
+        <label>
+          📚 表格
+          <select id="tableWorkspaceSelect">
+            <option value="">当前表格</option>
+          </select>
+        </label>
+        <label class="table-upload-field">
+          📎 上传表格（CSV / Excel / 飞书导出文件）
+          <input id="tableFileInput" type="file" accept=".csv,.tsv,.xlsx,.xlsm">
+        </label>
+        <label>
+          📁 表格路径（CSV / Excel / 飞书导出文件）
+          <input id="csvPath" placeholder="/path/to/cases.xlsx 或 /path/to/cases.csv" value="/Users/bytedance/Desktop/try-on-exp/AI试穿线下评测集v4.0-0420副本.csv">
+        </label>
+        <button id="loadCsvBtn" type="button">📂 按路径加载</button>
+        <button id="saveCsvBtn" type="button">💾 保存结果</button>
+      </section>
+
+      <section class="workspace">
+        <aside class="case-list">
+          <div class="case-list-head">
+            <strong>Cases</strong>
+            <span id="caseCount">0</span>
+          </div>
+          <section class="case-navigator">
+            <button id="prevCaseBtn" type="button">◀ 上一条</button>
+            <label>
+              当前
+              <input id="caseJumpInput" type="number" min="1" value="1">
+            </label>
+            <button id="nextCaseBtn" type="button">下一条 ▶</button>
+            <span id="casePosition">0 / 0</span>
+          </section>
+          <section class="filters">
+            <label>
+              🔍 维度
+              <select id="dimensionFilter">
+                <option value="all">全部维度</option>
+                <option value="face">面部特征与妆造发型还原</option>
+                <option value="pose">姿势微调与肢体自然度</option>
+                <option value="clothing">服装特征保留度</option>
+                <option value="scene">场景氛围与背景幻觉</option>
+              </select>
+            </label>
+            <label>
+              ⭐ 分数
+              <select id="scoreFilter">
+                <option value="all">全部分数</option>
+                <option value="0">0 分</option>
+                <option value="1">1 分</option>
+                <option value="2">2 分</option>
+              </select>
+            </label>
+            <label>
+              📝 关键词
+              <input id="keywordFilter" placeholder="匹配问题类型/归因备注">
+            </label>
+            <label>
+              改善状态
+              <select id="improvementFilter">
+                <option value="all">全部状态</option>
+                <option value="needs-review">未改善 + 待确认</option>
+                <option value="未改善">未改善</option>
+                <option value="待确认">待确认</option>
+                <option value="改善">改善</option>
+                <option value="部分改善">部分改善</option>
+              </select>
+            </label>
+            <label>
+              🔃 排序
+              <select id="sortOrder">
+                <option value="original">原始顺序</option>
+                <option value="zero-first">0 分优先</option>
+                <option value="updated">最近修改</option>
+                <option value="problem">问题类型</option>
+              </select>
+            </label>
+            <div class="filter-actions">
+              <button id="selectFilteredBtn" type="button" onclick="window.__tryonSelectFilteredCases?.()">☑️ 全选当前筛选</button>
+              <button id="clearCheckedBtn" type="button" onclick="window.__tryonClearCheckedCases?.()">❌ 清空勾选</button>
+            </div>
+          </section>
+          <div id="caseList"></div>
+        </aside>
+
+        <section class="review">
+          <nav id="workflowTabs" class="workflow-tabs" aria-label="自优化工作流">
+            <button class="workflow-tab active" type="button" data-tab="overview">
+              📊 问题聚类
+            </button>
+            <button class="workflow-tab" type="button" data-tab="evaluation">
+              📈 整体评测
+            </button>
+            <button class="workflow-tab" type="button" data-tab="inspect">
+              🔎 侦查证据
+            </button>
+            <button class="workflow-tab" type="button" data-tab="optimize">
+              ⚡ 优化复跑
+            </button>
+          </nav>
+
+          <section class="tab-panel active" data-tab-panel="overview">
+            <section class="workflow-strip">
+              <article>
+                <strong>1. 看分布</strong>
+                <span>先选高频问题簇</span>
+              </article>
+              <article>
+                <strong>2. 查样本</strong>
+                <span>逐 case 对图和证据</span>
+              </article>
+              <article>
+                <strong>3. 定位改法</strong>
+                <span>记录 PM 技术原因</span>
+              </article>
+              <article>
+                <strong>4. 复跑验证</strong>
+                <span>标记改善率</span>
+              </article>
+            </section>
+
+            <section class="optimization-board">
+              <div class="section-head">
+                <div>
+                  <span class="eyebrow">Prompt optimization loop</span>
+                  <h2>问题簇与优化看板</h2>
+                </div>
+                <div class="section-actions">
+                  <label class="inline-control compact">
+                    问题簇
+                    <select id="clusterSelect"></select>
+                  </label>
+                  <button id="selectClusterBtn" type="button">☑️ 勾选该簇</button>
+                </div>
+              </div>
+              <div class="import-row">
+                <label>
+                  📁 历史侦查表
+                  <input id="techReasonPath" value="/Users/bytedance/Downloads/v5-badcase技术原因定位.xlsx">
+                </label>
+                <button id="importTechReasonsBtn" type="button">📥 按 ai_content 导入</button>
+              </div>
+              <div id="metricGrid" class="metric-grid"></div>
+              <div id="reviewQuickFilters" class="review-quick-filters"></div>
+              <div id="clusterList" class="cluster-list"></div>
+              <div id="investigationBoard" class="investigation-board"></div>
+              <div id="peChangeBoard" class="pe-change-board"></div>
+            </section>
+          </section>
+
+          <section class="tab-panel" data-tab-panel="evaluation">
+            <section class="evaluation-workbench">
+              <div class="section-head">
+                <div>
+                  <span class="eyebrow">Evaluation rounds</span>
+                  <h2>📈 整体评测管理</h2>
+                </div>
+                <div class="section-actions">
+                  <button id="saveEvaluationBtn" type="button" class="primary">💾 保存本轮评测</button>
+                  <button id="deleteEvaluationBtn" type="button" class="danger">🗑️ 删除评测</button>
+                </div>
+              </div>
+              <div class="evaluation-form">
+                <label>
+                  评测记录
+                  <select id="evaluationSelect">
+                    <option value="">新建评测</option>
+                  </select>
+                </label>
+                <label>
+                  评测主题
+                  <input id="evaluationTheme" placeholder="例如：v5 最终 prompt 全量评测">
+                </label>
+                <label>
+                  评测日期
+                  <input id="evaluationDate" type="date">
+                </label>
+                <label>
+                  样本量
+                  <input id="evaluationSampleSize" type="number" min="1" placeholder="例如 400">
+                </label>
+                <label>
+                  VLM Prompt 版本
+                  <input id="evaluationVlmVersion" placeholder="例如 vlm-v5.2">
+                </label>
+                <label>
+                  生图 Prompt 版本
+                  <input id="evaluationGenVersion" placeholder="例如 gen-prompt-0427-cot">
+                </label>
+                <label class="table-upload-field">
+                  上传评测表
+                  <input id="evaluationFileInput" type="file" accept=".csv,.tsv,.xlsx,.xlsm">
+                </label>
+              </div>
+              <div id="evaluationSummary" class="evaluation-summary"></div>
+              <div id="evaluationCompare" class="evaluation-compare"></div>
+              <div id="evaluationClusterList" class="evaluation-cluster-list"></div>
+            </section>
+          </section>
+
+          <section class="tab-panel" data-tab-panel="inspect">
+            <div class="stage-toolbar">
+              <div>
+                <span class="eyebrow">Image comparison</span>
+                <h2>🖼️ 图片展示台</h2>
+              </div>
+            </div>
+            <div id="imageGrid" class="image-grid empty">
+              <p>选择一个 case 后展示图片对比</p>
+            </div>
+            <section class="run-gallery-card">
+              <div class="run-gallery-head">
+                <div>
+                  <span class="eyebrow">Rerun results</span>
+                  <h2>🔄 复跑记录</h2>
+                </div>
+                <button id="rerunFailedBtn" type="button" class="secondary">🔄 重跑失败 Run</button>
+                <label class="inline-control compact">
+                  清空范围
+                  <select id="clearRunsScope">
+                    <option value="current">当前 Case</option>
+                    <option value="checked">勾选 Case</option>
+                    <option value="filtered">当前筛选</option>
+                    <option value="cluster">当前问题簇</option>
+                    <option value="experiment">当前实验全部 Case</option>
+                  </select>
+                </label>
+                <button id="clearRunsBtn" type="button" class="secondary">清空复跑记录</button>
+                <select id="runSelect" class="visually-hidden" aria-label="复跑记录"></select>
+                <div id="runImprovementControls" class="run-improvement-controls"></div>
+              </div>
+              <div id="runTabs" class="run-tabs"></div>
+            </section>
+
+            <section class="evidence-card evidence-card-compact">
+              <div class="section-head">
+                <div>
+                  <span class="eyebrow">Text evidence</span>
+                  <h2>📝 原始证据</h2>
+                </div>
+                <label class="inline-control">
+                  展示
+                  <select id="evidenceSelect">
+                    <option value="prompt">原始 prompt</option>
+                    <option value="user_vlm">user_vlm</option>
+                    <option value="outfit_vlm">outfit_vlm</option>
+                    <option value="run_prompt">当前 Run prompt</option>
+                    <option value="run_raw_output">当前 Run 原始输出</option>
+                    <option value="run_error">当前 Run 错误</option>
+                  </select>
+                </label>
+              </div>
+              <div id="evidenceMeta" class="evidence-meta">原始证据</div>
+              <pre id="evidenceText"></pre>
+            </section>
+
+            <section class="analysis-card">
+              <div class="section-head">
+                <h2>🔍 侦查定位</h2>
+                <div class="section-actions">
+                  <button id="saveNotesBtn" type="button">💾 保存侦查记录</button>
+                  <button id="applyInvestigationBtn" type="button">📋 批量应用侦查</button>
+                </div>
+              </div>
+              <div class="pm-grid">
+                <label>
+                  问题所在
+                  <select id="pmIssueLocation">
+                    <option value="生图 Prompt">生图 Prompt</option>
+                    <option value="用户 VLM">用户 VLM</option>
+                    <option value="搭配 VLM">搭配 VLM</option>
+                    <option value="模型理解能力">模型理解能力</option>
+                    <option value="模型生图能力">模型生图能力</option>
+                    <option value="工程链路">工程链路</option>
+                  </select>
+                </label>
+                <label>
+                  来源字段
+                  <input id="pmSourceField" placeholder="例如 user_vlm.Skin_Texture / prompt.负向提示词">
+                </label>
+                <label>
+                  处理方式
+                  <select id="pmResolutionType">
+                    <option value="修改用户 VLM">修改用户 VLM</option>
+                    <option value="修改搭配 VLM">修改搭配 VLM</option>
+                    <option value="修改生图 Prompt">修改生图 Prompt</option>
+                    <option value="记录模型能力问题">记录模型能力问题</option>
+                    <option value="转工程">转工程</option>
+                  </select>
+                </label>
+                <label>
+                  应用范围
+                  <select id="pmApplyScope">
+                    <option value="experiment">当前实验全部 Case</option>
+                    <option value="cluster">当前问题簇</option>
+                    <option value="filtered">当前筛选</option>
+                    <option value="checked">勾选 Case</option>
+                    <option value="current">当前 Case</option>
+                  </select>
+                </label>
+                <label class="wide">
+                  具体问题
+                  <input id="pmSpecificIssue" placeholder="例如：prompt 过度强调雀斑，来源是 user_vlm.Skin_Texture">
+                </label>
+              </div>
+              <div class="action-grid">
+                <label>
+                  本轮 Prompt 修改说明（自动识别）
+                  <textarea id="changeSummary" class="short readonly-field" readonly placeholder="修改 Coze Prompt / VLM 后，这里会自动概括变化"></textarea>
+                </label>
+                <label>
+                  复跑效果结论（自动统计）
+                  <textarea id="effectConclusion" class="short readonly-field" readonly placeholder="标记复跑 case 是否改善后，这里会自动计算改善率"></textarea>
+                </label>
+              </div>
+              <details class="advanced-panel">
+                <summary>🤖 单 case 辅助裁判与过程备注</summary>
+                <div class="section-actions nested-actions">
+                  <label class="inline-control compact">
+                    裁判对象
+                    <select id="judgeTarget">
+                      <option value="current">当前展示 Run 改善</option>
+                      <option value="latest">最新 Run 改善</option>
+                      <option value="original">原始 case 校准</option>
+                    </select>
+                  </label>
+                  <button id="judgeCaseBtn" type="button">🤖 AI 裁判当前 Case</button>
+                </div>
+                <div id="judgeResult" class="judge-result">AI 裁判结果会显示在这里。</div>
+                <div class="note-grid">
+                  <label>
+                    人工定位备注
+                    <textarea id="manualNote" class="short" placeholder="补充单 case 观察，非必填"></textarea>
+                  </label>
+                  <label>
+                    优化方向
+                    <textarea id="optimizationDirection" class="short" placeholder="补充单 case 优化方向，非必填"></textarea>
+                  </label>
+                </div>
+              </details>
+            </section>
+
+          </section>
+
+          <section class="tab-panel" data-tab-panel="optimize">
+            <section class="analysis-card">
+              <div class="section-head">
+                <h2>⚡ 优化复跑</h2>
+                <div class="section-actions">
+                  <button id="recordPeChangeBtn" type="button">📝 记录 PE 修改</button>
+                  <button id="applyPeChangeRunBtn" type="button" class="primary">▶ 应用并复跑范围</button>
+                </div>
+              </div>
+              <details class="advanced-panel input-edit-panel" open>
+                <summary>🖼️ 输入图片 URL 修改台</summary>
+                <section class="input-url-grid">
+                  <label>
+                    User Image URL
+                    <input id="overrideUserImage" placeholder="留空则不修改 user_image">
+                  </label>
+                  <label>
+                    Outfit Image URL
+                    <input id="overrideOutfitImage" placeholder="留空则不修改 outfit_image">
+                  </label>
+                  <label>
+                    应用范围
+                    <select id="imageOverrideScope">
+                      <option value="current">当前 Case</option>
+                      <option value="checked">勾选 Case</option>
+                      <option value="filtered">当前筛选</option>
+                      <option value="cluster">当前问题簇</option>
+                      <option value="experiment">当前实验全部 Case</option>
+                    </select>
+                  </label>
+                  <button id="applyImageOverridesBtn" type="button">应用图片 URL</button>
+                </section>
+                <p class="hint">应用后再复跑，会使用修改后的 user_image / outfit_image。只填写其中一个 URL 时，只替换对应图片。</p>
+              </details>
+              <details class="advanced-panel ad-hoc-run-panel" open>
+                <summary>🧪 临时图片复跑</summary>
+                <section class="ad-hoc-run-grid">
+                  <label>
+                    新 User Image URL
+                    <input id="adHocUserImage" placeholder="本次复跑使用的 user_image URL">
+                  </label>
+                  <label>
+                    新 Outfit Image URL
+                    <input id="adHocOutfitImage" placeholder="本次复跑使用的 outfit_image URL">
+                  </label>
+                  <label>
+                    次数
+                    <input id="adHocRunCount" type="number" min="1" max="20" value="1">
+                  </label>
+                  <button id="fillAdHocImagesBtn" type="button">使用当前 Case 图片</button>
+                  <button id="runAdHocBtn" type="button" class="primary">应用 Prompt 并复跑新图</button>
+                </section>
+                <p class="hint">默认读取当前 case 的 user_image / outfit_image；你也可以手动改成新 URL。本复跑不修改实验台已有 case。</p>
+                <div id="adHocRunResults" class="ad-hoc-run-results">临时复跑结果会显示在这里。</div>
+              </details>
+              <details class="advanced-panel prompt-edit-panel" open>
+                <summary>✏️ Coze Prompt / VLM 修改台</summary>
+                <section class="prompt-grid">
+                  <label>
+                    User VLM 系统提示词
+                    <textarea id="userSystemPrompt"></textarea>
+                  </label>
+                  <label>
+                    User VLM 用户提示词
+                    <textarea id="userPrompt" class="short"></textarea>
+                  </label>
+                  <label>
+                    Outfit VLM 系统提示词
+                    <textarea id="outfitSystemPrompt"></textarea>
+                  </label>
+                  <label>
+                    Outfit VLM 用户提示词
+                    <textarea id="outfitPrompt" class="short"></textarea>
+                  </label>
+                  <label class="wide">
+                    生图 Prompt 拼接代码
+                    <textarea id="promptCode"></textarea>
+                  </label>
+                </section>
+              </details>
+            </section>
+
+            <div hidden>
+              <pre id="currentPrompt"></pre>
+              <pre id="rawOutput"></pre>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+    <div id="imageLightbox" class="image-lightbox" hidden>
+      <button id="imageLightboxClose" type="button" aria-label="关闭大图">×</button>
+      <img id="imageLightboxImg" alt="大图预览">
+      <div id="imageLightboxTitle" class="image-lightbox-title"></div>
+    </div>
+    <script type="module" src="./app.js?v=ad-hoc-autofill-1"></script>
+  </body>
+</html>
