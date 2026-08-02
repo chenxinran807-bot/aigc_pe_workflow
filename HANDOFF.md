@@ -21,6 +21,8 @@
 - 豆包 1.6 视觉命中手指/关节 3/3、背景变化 1/2、Logo/图案 1/2；未命中发型变化 0/2、身材差异 0/1、衣服边缘穿模 0/1。
 - 已为评测器加入维度内语义标签归一化，避免“手指数量异常”和“手指/关节轻微瑕疵”等同义标签被错误算作不命中；同时单独统计输入失败。
 - Coze 唯一测试副本当前已切换为豆包 1.6 视觉理解-250815并自动保存，仍未发布。
+- 已确认采用“逐案例聚焦”的额外发现审查页：三张图片、人工标签和模型额外发现同时展示；每条发现独立标记为真实问题、模型误报或不确定。
+- 已完成审查页书面设计：`docs/superpowers/specs/2026-08-02-extra-finding-review-design.md`；当前停在用户复核设计文档的门禁，尚未进入实现。
 
 ## 重要决策
 
@@ -30,11 +32,13 @@
 - 修正后公平重测显示豆包 1.6 视觉是当前最佳单模型候选；下一阶段优先对其做 Prompt 优化，不进入模型协作。
 - Prompt 调试只查看训练集标签；验证集只比较候选版本；测试集在最终候选确定前冻结。
 - 模型额外发现但人工未标注的问题记录为 `unverified_extra_finding`，不直接算正式误报。
+- Prompt 优化采用平衡模式；先完成人工审查，再利用已确认结论约束召回与误报，冻结验证集和测试集不进入审查页。
 
 ## 待完成事项
 
 - 仅对豆包 1.6 视觉在训练集优化发型变化、衣服边缘穿模、细微背景变化和 Logo/图案漏检，并约束额外发现数量。
-- 抽样人工复核 17 个 `unverified_extra_finding`，判断其是真实补充问题还是模型误报；在复核前不把 strict F1 当正式精确率。
+- 用户复核并批准审查页书面设计后，编写实施计划并实现页面。
+- 逐条人工复核当前 17 个 `unverified_extra_finding`，判断其是真实补充问题、模型误报或不确定；在复核前不把 strict F1 当正式精确率。
 - 用 20 条冻结验证集比较候选 Prompt；最终候选确定后只运行一次 11 条测试集。
 - 单模型达到瓶颈后，分析不同模型错误是否互补；只有存在明确增益时才测试主模型+疑难复核协作。
 
@@ -48,7 +52,7 @@
 
 ## 当前代码状态
 
-- 当前分支：`codex/tryon-audit-evaluation-loop`。
+- 当前 PR 工作树分支：`codex/add-tryon-audit-evaluation`。
 - 主要目录：`tryon-prompt-optimizer-runtime/`；当前仍为仓库未追踪目录，保留用户其他未追踪文件，不清理。
 - 关键文件：`src/audit-workflow-runner.mjs`、`src/coze-string-workflow.mjs`、`src/audit-split.mjs`、`src/audit-evaluation.mjs`、`scripts/split-audit-dataset.mjs`、`AUDIT_EVALUATION.md`。
 - 固定切分：`work/audit-split.json`；运行结果位于 `work/*predictions.json` 和 `work/*report.json`，已由 `.gitignore` 忽略。
@@ -58,4 +62,4 @@
 
 ## 下一步
 
-以豆包 1.6 视觉为最佳单模型候选，在训练集迭代 Prompt，优先提升发型、穿模、背景和 Logo/图案问题召回并降低额外发现；候选稳定后再进入 20 条冻结验证集，暂不测试模型协作。
+请用户复核 `docs/superpowers/specs/2026-08-02-extra-finding-review-design.md`。确认书面方案后先编写实施计划，再实现额外发现审查页；完成 17 条人工审查后，才开始豆包 1.6 平衡型 Prompt 优化。
