@@ -1,0 +1,20 @@
+第一审核者候选：
+{{candidate_json}}
+
+逐条核验，严格返回：
+{
+  "verifications":[
+    {
+      "id":"与候选id完全一致",
+      "verdict":"supported|rejected|uncertain",
+      "visible_evidence":"你在图片中实际看到的核验证据；rejected也要说明不符之处",
+      "confidence":0.0
+    }
+  ],
+  "kept_issue_ids":[],
+  "rejected_issue_ids":[],
+  "uncertain_issue_ids":[],
+  "summary":""
+}
+
+不得新增候选，不得输出 Markdown。
