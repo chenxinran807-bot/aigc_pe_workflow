@@ -53,7 +53,7 @@ export function buildAuditWorkflowRequest(item, options = {}, workflow = AUDIT_W
   return {
     url: workflow.url,
     inputs: Object.fromEntries(Object.entries(roleMap)
-      .map(([field, role]) => [field, item.images[role]])),
+      .map(([field, role]) => [field, item.images?.[role] || ""])),
     ...(Object.keys(files).length ? { files } : {}),
     timeoutMs: options.timeoutMs || 180000,
     reuseOpenPage: options.reuseOpenPage ?? true,
