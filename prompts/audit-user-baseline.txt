@@ -1,0 +1,18 @@
+审核当前三张图片，严格返回：
+{
+  "face":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "pose":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "clothing":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "scene":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "bottom_line_issues":[],
+  "final_result":"pass",
+  "needs_human_review":false,
+  "overall_confidence":0.0,
+  "summary":""
+}
+要求：
+- issues 使用短而具体的问题名称；没有问题才返回空数组。
+- evidence 必须写明生成图中的位置、现象及其与用户图或搭配图的差异。
+- final_result 只能是 pass、issue、review。
+- 任一维度 score=0 时 final_result=issue；仅有 score=1 时至少为 review。
+- overall_confidence 禁止无依据输出 1.0。
