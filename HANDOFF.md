@@ -29,6 +29,8 @@
 - 已测试 Prompt v2 balanced：前 5 条所有 issues 为空，误报下降但人工问题召回归零，不升级。
 - 已测试 Prompt v2.1 targeted：前 2 条均有人工手指/关节问题，模型仍以 0.9 confidence 判正常；提前停止，不升级。
 - 已将 Coze 唯一测试副本恢复到当前最佳基线 Prompt 并确认自动保存，仍未发布。
+- 已实现确定性本地组合裁剪图生成、本地文件 Coze 输入和训练集实验脚本；10 个比较 Case 的 30 张组合图已成功生成。
+- 已完成 4 条定向裁剪 smoke：原图基线召回 2/4、额外发现 12 条；组合裁剪图召回 4/4、额外发现 17 条。裁剪输出还出现占位描述、模糊证据和语义混淆。
 
 ## 重要决策
 
@@ -41,11 +43,12 @@
 - Prompt 优化采用平衡模式；先完成人工审查，再利用已确认结论约束召回与误报，冻结验证集和测试集不进入审查页。
 - Prompt 能改变报告倾向，但当前实验没有证明能改善细粒度视觉理解；不再继续堆叠提示词。
 - 下一步仍保持豆包 1.6 单模型，先测试确定性的局部裁剪/放大输入；局部输入仍无增益后才讨论模型协作。
+- `contact-sheet-v1` 不升级，不运行剩余 6 条，不进入冻结验证集，也不建设内部 HTTP 裁剪服务；定向召回提升不足以抵消额外发现和证据质量退化。
 
 ## 待完成事项
 
 - 仅对豆包 1.6 视觉在训练集优化发型变化、衣服边缘穿模、细微背景变化和 Logo/图案漏检，并约束额外发现数量。
-- 设计并执行局部裁剪/放大实验，重点覆盖脸部、双手、服装 Logo/图案和服装边缘。
+- 如继续输入链路实验，只测试原图与局部图作为独立具名图片变量，不再把多视图拼成一张图。
 - 将人工复核后的 2 条真实补充与 15 条误报纳入训练集精确率统计。
 - 用 20 条冻结验证集比较候选 Prompt；最终候选确定后只运行一次 11 条测试集。
 - 单模型达到瓶颈后，分析不同模型错误是否互补；只有存在明确增益时才测试主模型+疑难复核协作。
@@ -65,9 +68,10 @@
 - 关键文件：`src/audit-workflow-runner.mjs`、`src/coze-string-workflow.mjs`、`src/audit-split.mjs`、`src/audit-evaluation.mjs`、`scripts/split-audit-dataset.mjs`、`AUDIT_EVALUATION.md`。
 - 固定切分：`work/audit-split.json`；运行结果位于 `work/*predictions.json` 和 `work/*report.json`，已由 `.gitignore` 忽略。
 - 模型比较集：`work/model-comparison-set.json`；公平重测结果为 `work/fair-*.json`。
-- 最近验证：远程 `main` 工作区执行 `npm test`，64 项全部通过（含本次新增 10 项）。
+- 新增文件：`src/audit-contact-sheet.mjs`、`scripts/build-audit-contact-sheets.mjs`、`scripts/run-audit-crop-experiment.mjs`、`docs/crop-input-experiment-2026-08-02.md` 及对应测试。
+- 最近验证：本分支 `npm test` 69 项全部通过。
 - GitHub 发布分支：`codex/add-tryon-audit-evaluation`；提交 `8fed2a1`；Draft PR：`https://github.com/chenxinran807-bot/aigc_pe_workflow/pull/1`。
 
 ## 下一步
 
-保持 Coze 基线 Prompt，不进入验证集。下一步先在训练比较集测试同一豆包 1.6 的局部裁剪/放大输入，判断召回能否在不恢复大量误报的前提下提升。
+保持豆包 1.6、基线 Prompt 和冻结验证/测试集不变。若继续视觉输入研究，下一步仅做“原图 + 独立具名局部图”的小规模训练集实验；否则回到当前基线，汇总单模型能力上限与未解决漏检，不启用模型协作。

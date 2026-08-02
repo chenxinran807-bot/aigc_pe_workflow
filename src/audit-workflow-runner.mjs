@@ -5,17 +5,7 @@ export async function runAuditCase(item, options = {}) {
   const runner = options.runner || runStringWorkflow;
   const workflow = options.workflow || AUDIT_WORKFLOW;
   const startedAtMs = Date.now();
-  const request = {
-    url: workflow.url,
-    inputs: {
-      generated_image: item.images.generated,
-      outfit_image: item.images.outfit,
-      user_image: item.images.user,
-    },
-    timeoutMs: options.timeoutMs || 180000,
-    reuseOpenPage: options.reuseOpenPage ?? true,
-    inputSettleMs: options.inputSettleMs ?? 3500,
-  };
+  const request = buildAuditWorkflowRequest(item, options, workflow);
   const firstResult = await runner(request);
   const firstExtracted = extractAuditResult(firstResult?.scrape);
   const shouldRetry = options.retryMissingImages !== false
@@ -35,6 +25,27 @@ export async function runAuditCase(item, options = {}) {
     raw: extracted.raw,
     error: result?.ok ? "" : result?.error || "workflow failed",
     inputWarmRetry: shouldRetry,
+    inputVariant: options.inputVariant || "original-url",
+  };
+}
+
+export function buildAuditWorkflowRequest(item, options = {}, workflow = AUDIT_WORKFLOW) {
+  const roleMap = {
+    generated_image: "generated",
+    outfit_image: "outfit",
+    user_image: "user",
+  };
+  const files = Object.fromEntries(Object.entries(roleMap)
+    .filter(([, role]) => options.files?.[role])
+    .map(([field, role]) => [field, options.files[role]]));
+  return {
+    url: workflow.url,
+    inputs: Object.fromEntries(Object.entries(roleMap)
+      .map(([field, role]) => [field, item.images[role]])),
+    ...(Object.keys(files).length ? { files } : {}),
+    timeoutMs: options.timeoutMs || 180000,
+    reuseOpenPage: options.reuseOpenPage ?? true,
+    inputSettleMs: options.inputSettleMs ?? (Object.keys(files).length ? 1000 : 3500),
   };
 }
 

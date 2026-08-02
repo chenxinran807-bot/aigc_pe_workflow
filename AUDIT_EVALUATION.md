@@ -59,3 +59,7 @@ npm run audit:review-html -- <dataset.json> <split.json> <doubao-1.6-report.json
 ```
 
 生成的 HTML 同时展示用户图、搭配图、生成图、人工历史标签和模型额外发现。审查结论保存在浏览器本地，可导出 JSON；运行文件由 Git 忽略。审查完成后应立即回到豆包 1.6 Prompt 优化和冻结验证集回归。
+
+## 局部裁剪输入实验
+
+仓库提供 `audit:build-crops` 和 `audit:run-crops`，用于在训练比较集构建组合裁剪图并通过本地文件输入运行 Coze。2026-08-02 的定向 smoke 中，`contact-sheet-v1` 将 4 个目标问题召回从 2 提高到 4，但额外发现从 12 增至 17，且证据出现占位描述与语义混淆，因此该输入方案不升级、不进入验证集，也不建设内部 HTTP 裁剪服务。详见 `docs/crop-input-experiment-2026-08-02.md`。

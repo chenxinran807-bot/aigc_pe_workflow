@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { extractAuditResult, hasMissingImageResult, runAuditCase } from "../src/audit-workflow-runner.mjs";
+import { buildAuditWorkflowRequest, extractAuditResult, hasMissingImageResult, runAuditCase } from "../src/audit-workflow-runner.mjs";
 
 test("extracts nested audit_result JSON from Coze text", () => {
   const payload = JSON.stringify({ clothing: { score: 1, issues: ["logo模糊"] } });
@@ -54,4 +54,39 @@ test("recognizes only explicit missing-input results", () => {
   assert.equal(hasMissingImageResult({ face: { issues: ["输入缺失"] } }), true);
   assert.equal(hasMissingImageResult({ face: { issues: ["未获取用户图相关信息"] } }), true);
   assert.equal(hasMissingImageResult({ face: { issues: ["发型发生轻微改变"] } }), false);
+});
+
+test("passes local contact sheets separately from blind URL inputs", async () => {
+  let received;
+  const runner = async (request) => {
+    received = request;
+    const payload = JSON.stringify({ face: { issues: [] } });
+    return { ok: true, scrape: { text: `audit_result : ${JSON.stringify(payload)}` } };
+  };
+  const item = {
+    caseId: "crop-1",
+    images: { user: "u", outfit: "o", generated: "g" },
+  };
+  const files = { user: "/tmp/u.jpg", outfit: "/tmp/o.jpg", generated: "/tmp/g.jpg" };
+  const result = await runAuditCase(item, { runner, files, inputVariant: "contact-sheet-v1" });
+  assert.deepEqual(received.files, {
+    generated_image: "/tmp/g.jpg",
+    outfit_image: "/tmp/o.jpg",
+    user_image: "/tmp/u.jpg",
+  });
+  assert.equal(result.inputVariant, "contact-sheet-v1");
+});
+
+test("builds a role-preserving workflow request for local files", () => {
+  const request = buildAuditWorkflowRequest({
+    caseId: "crop-2",
+    images: { user: "u", outfit: "o", generated: "g" },
+  }, {
+    files: { user: "/tmp/u.jpg", outfit: "/tmp/o.jpg", generated: "/tmp/g.jpg" },
+    inputSettleMs: 500,
+  }, { url: "https://example.test/workflow" });
+  assert.equal(request.url, "https://example.test/workflow");
+  assert.equal(request.files.user_image, "/tmp/u.jpg");
+  assert.equal(request.inputs.generated_image, "g");
+  assert.equal(request.inputSettleMs, 500);
 });
