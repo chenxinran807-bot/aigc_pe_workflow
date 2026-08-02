@@ -1,6 +1,12 @@
 import { closeWorkflowPage, delay, findWorkflowPageByUrl, js, openWorkflowPage, withCozePage } from "./coze-cdp.mjs";
 
-export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuseOpenPage = false }) {
+export async function runStringWorkflow({
+  url,
+  inputs,
+  timeoutMs = 120000,
+  reuseOpenPage = false,
+  inputSettleMs = 3500,
+}) {
   const page = reuseOpenPage ? await findWorkflowPageByUrl(url) : await openWorkflowPage(undefined, url);
   try {
     return await withCozePage(async ({ cdp, contextId }) => {
@@ -114,6 +120,10 @@ export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuse
       })()`);
       const finalFillResult = fillResult?.ok ? fillResult : await fillInputsViaJsonMode(cdp, evalInCoze, inputs, fillResult);
       if (!finalFillResult?.ok) return { ok: false, error: "input fill failed", scrape: finalFillResult };
+
+      // URL image inputs can be accepted by the form before Coze finishes
+      // fetching them. Running immediately can make the model see no images.
+      if (inputSettleMs > 0) await delay(inputSettleMs);
 
       const beforeRun = await scrapeVisible(evalInCoze);
       const runClick = await evalInCoze(`(() => {

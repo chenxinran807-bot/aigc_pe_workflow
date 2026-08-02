@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
+    "audit:collect": "node scripts/collect-audit-dataset.mjs",
+    "audit:split": "node scripts/split-audit-dataset.mjs",
+    "audit:run": "node scripts/run-audit-batch.mjs",
+    "audit:evaluate": "node scripts/evaluate-audit-results.mjs",
     "dev": "PORT=5246 HOST=127.0.0.1 node server.mjs",
     "start": "node server.mjs",
     "start:lan": "HOST=0.0.0.0 node server.mjs"
