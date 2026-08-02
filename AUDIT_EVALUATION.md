@@ -49,3 +49,13 @@ npm run audit:evaluate -- \
 - `pendingCases`：数据集中尚未运行的 Case，不计为解析失败。
 
 0/1/2 分保留在数据集和模型输出中，只作为缺少细粒度问题标签时的辅助指标。
+
+## 临时额外发现审查
+
+该页面只用于 Prompt 优化前核验模型额外发现，不是通用标注产品。
+
+```bash
+npm run audit:review-html -- <dataset.json> <split.json> <doubao-1.6-report.json> work/extra-findings-review.html
+```
+
+生成的 HTML 同时展示用户图、搭配图、生成图、人工历史标签和模型额外发现。审查结论保存在浏览器本地，可导出 JSON；运行文件由 Git 忽略。审查完成后应立即回到豆包 1.6 Prompt 优化和冻结验证集回归。

@@ -9,6 +9,7 @@
     "audit:split": "node scripts/split-audit-dataset.mjs",
     "audit:run": "node scripts/run-audit-batch.mjs",
     "audit:evaluate": "node scripts/evaluate-audit-results.mjs",
+    "audit:review-html": "node scripts/build-extra-review-html.mjs",
     "dev": "PORT=5246 HOST=127.0.0.1 node server.mjs",
     "start": "node server.mjs",
     "start:lan": "HOST=0.0.0.0 node server.mjs"

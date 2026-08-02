@@ -1,5 +1,7 @@
 # AI 试穿额外发现审查工具 Implementation Plan
 
+> **已废弃（2026-08-02）：** 用户确认该页面只是一次性辅助审查工具，不需要产品化存储、API 或 TDD。实际实现收敛为 `scripts/build-extra-review-html.mjs` 生成自包含临时 HTML。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 构建一个训练集专用的本地审查页，帮助人工核验当前 17 个模型额外发现，并把结论交给后续豆包 1.6 平衡型 Prompt 优化。
