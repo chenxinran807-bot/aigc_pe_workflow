@@ -53,7 +53,8 @@
 - 关键文件：`src/audit-workflow-runner.mjs`、`src/coze-string-workflow.mjs`、`src/audit-split.mjs`、`src/audit-evaluation.mjs`、`scripts/split-audit-dataset.mjs`、`AUDIT_EVALUATION.md`。
 - 固定切分：`work/audit-split.json`；运行结果位于 `work/*predictions.json` 和 `work/*report.json`，已由 `.gitignore` 忽略。
 - 模型比较集：`work/model-comparison-set.json`；公平重测结果为 `work/fair-*.json`。
-- 最近验证：`npm test`，10 项全部通过。
+- 最近验证：远程 `main` 工作区执行 `npm test`，64 项全部通过（含本次新增 10 项）。
+- GitHub 发布分支：`codex/add-tryon-audit-evaluation`；提交 `8fed2a1`；Draft PR：`https://github.com/chenxinran807-bot/aigc_pe_workflow/pull/1`。
 
 ## 下一步
 
