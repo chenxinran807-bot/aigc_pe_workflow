@@ -90,3 +90,33 @@ test("builds a role-preserving workflow request for local files", () => {
   assert.equal(request.inputs.generated_image, "g");
   assert.equal(request.inputSettleMs, 500);
 });
+
+test("maps five named detail images without exposing human truth", () => {
+  const item = {
+    caseId: "detail-1",
+    images: { user: "u", outfit: "o", generated: "g" },
+    dimensions: { pose: { issues: ["human-secret"] } },
+  };
+  const request = buildAuditWorkflowRequest(item, {
+    detailFiles: {
+      user_face_detail: "/tmp/user-face.jpg",
+      generated_face_detail: "/tmp/generated-face.jpg",
+      outfit_clothing_detail: "/tmp/outfit-clothing.jpg",
+      generated_clothing_detail: "/tmp/generated-clothing.jpg",
+      generated_hand_detail: "/tmp/generated-hand.jpg",
+    },
+  });
+  assert.deepEqual(Object.keys(request.files).sort(), [
+    "generated_clothing_detail",
+    "generated_face_detail",
+    "generated_hand_detail",
+    "outfit_clothing_detail",
+    "user_face_detail",
+  ]);
+  assert.deepEqual(request.inputs, {
+    generated_image: "g",
+    outfit_image: "o",
+    user_image: "u",
+  });
+  assert.equal(JSON.stringify(request).includes("human-secret"), false);
+});

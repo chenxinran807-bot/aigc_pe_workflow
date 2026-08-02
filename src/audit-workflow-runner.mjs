@@ -1,6 +1,14 @@
 import { AUDIT_WORKFLOW } from "./audit-source-catalog.mjs";
 import { runStringWorkflow } from "./coze-string-workflow.mjs";
 
+const DETAIL_FIELDS = [
+  "user_face_detail",
+  "generated_face_detail",
+  "outfit_clothing_detail",
+  "generated_clothing_detail",
+  "generated_hand_detail",
+];
+
 export async function runAuditCase(item, options = {}) {
   const runner = options.runner || runStringWorkflow;
   const workflow = options.workflow || AUDIT_WORKFLOW;
@@ -35,9 +43,13 @@ export function buildAuditWorkflowRequest(item, options = {}, workflow = AUDIT_W
     outfit_image: "outfit",
     user_image: "user",
   };
-  const files = Object.fromEntries(Object.entries(roleMap)
+  const originalFileOverrides = Object.fromEntries(Object.entries(roleMap)
     .filter(([, role]) => options.files?.[role])
     .map(([field, role]) => [field, options.files[role]]));
+  const detailFiles = Object.fromEntries(DETAIL_FIELDS
+    .filter((field) => options.detailFiles?.[field])
+    .map((field) => [field, options.detailFiles[field]]));
+  const files = { ...originalFileOverrides, ...detailFiles };
   return {
     url: workflow.url,
     inputs: Object.fromEntries(Object.entries(roleMap)
