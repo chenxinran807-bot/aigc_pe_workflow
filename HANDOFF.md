@@ -31,6 +31,9 @@
 - 已将 Coze 唯一测试副本恢复到当前最佳基线 Prompt 并确认自动保存，仍未发布。
 - 已实现确定性本地组合裁剪图生成、本地文件 Coze 输入和训练集实验脚本；10 个比较 Case 的 30 张组合图已成功生成。
 - 已完成 4 条定向裁剪 smoke：原图基线召回 2/4、额外发现 12 条；组合裁剪图召回 4/4、额外发现 17 条。裁剪输出还出现占位描述、模糊证据和语义混淆。
+- 已实现“3 张原图 + 5 张独立具名局部图”的预处理、请求映射、固定 4 Case 清单和实验运行器；本地已生成 12 张标准化原图与 20 张局部图，人工标签不会进入 Coze 请求。
+- Coze 手工试运行表单会保留历史上传文件，并在八字段表单中发生动态错位；为避免产生污染结果，本轮未触发模型运行，具名局部图实验尚无结论。
+- 已将唯一 Coze 测试副本恢复为三输入基线：Start 与模型节点均只含 `user_image`、`outfit_image`、`generated_image`，局部图 Prompt 附录已移除，豆包 1.6 视觉保持不变并已自动保存，未发布。
 
 ## 重要决策
 
@@ -49,6 +52,7 @@
 
 - 仅对豆包 1.6 视觉在训练集优化发型变化、衣服边缘穿模、细微背景变化和 Logo/图案漏检，并约束额外发现数量。
 - 如继续输入链路实验，只测试原图与局部图作为独立具名图片变量，不再把多视图拼成一张图。
+- 为具名局部图实验选择一个可清空输入状态的受控运行面：优先使用工作流 API/批处理入口；若只能用 Coze UI，需经用户允许创建一次性测试副本。不要在当前残留试运行表单中继续上传。
 - 将人工复核后的 2 条真实补充与 15 条误报纳入训练集精确率统计。
 - 用 20 条冻结验证集比较候选 Prompt；最终候选确定后只运行一次 11 条测试集。
 - 单模型达到瓶颈后，分析不同模型错误是否互补；只有存在明确增益时才测试主模型+疑难复核协作。
@@ -69,9 +73,10 @@
 - 固定切分：`work/audit-split.json`；运行结果位于 `work/*predictions.json` 和 `work/*report.json`，已由 `.gitignore` 忽略。
 - 模型比较集：`work/model-comparison-set.json`；公平重测结果为 `work/fair-*.json`。
 - 新增文件：`src/audit-contact-sheet.mjs`、`scripts/build-audit-contact-sheets.mjs`、`scripts/run-audit-crop-experiment.mjs`、`docs/crop-input-experiment-2026-08-02.md` 及对应测试。
-- 最近验证：本分支 `npm test` 69 项全部通过。
-- GitHub 发布分支：`codex/add-tryon-audit-evaluation`；提交 `8fed2a1`；Draft PR：`https://github.com/chenxinran807-bot/aigc_pe_workflow/pull/1`。
+- 具名局部图相关文件：`src/audit-detail-images.mjs`、`src/audit-detail-manifest.mjs`、`scripts/build-audit-detail-images.mjs`、`scripts/run-audit-detail-experiment.mjs` 及对应测试。
+- 最近验证：本分支 `npm test` 74 项全部通过；`npm run audit:build-details` 生成 4 个 Case、12 张标准化原图和 20 张局部图。
+- GitHub 发布分支：`codex/add-tryon-audit-evaluation`；Draft PR：`https://github.com/chenxinran807-bot/aigc_pe_workflow/pull/1`。
 
 ## 下一步
 
-保持豆包 1.6、基线 Prompt 和冻结验证/测试集不变。若继续视觉输入研究，下一步仅做“原图 + 独立具名局部图”的小规模训练集实验；否则回到当前基线，汇总单模型能力上限与未解决漏检，不启用模型协作。
+保持豆包 1.6、基线 Prompt 和冻结验证/测试集不变。先解决具名局部图实验的干净输入通道，再仅对固定 4 条训练 Case 运行；成功标准仍为召回 4/4、额外发现少于 17 且无证据混淆。未得到该结果前不进入验证集，也不启用模型协作。
