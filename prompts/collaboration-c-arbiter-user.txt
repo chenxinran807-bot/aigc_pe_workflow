@@ -1,0 +1,20 @@
+第一审核者候选：
+{{candidate_json}}
+
+第二审核者核验：
+{{verification_json}}
+
+结合三张原图完成最终裁决，严格返回：
+{
+  "face":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "pose":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "clothing":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "scene":{"score":0,"issues":[],"evidence":"","confidence":0.0},
+  "bottom_line_issues":[],
+  "final_result":"pass|issue|human_review",
+  "needs_human_review":false,
+  "overall_confidence":0.0,
+  "summary":""
+}
+
+评分：2=没有保留的问题；1=保留轻微问题或存在 uncertain；0=保留明显问题。不得新增候选，不得输出 Markdown。

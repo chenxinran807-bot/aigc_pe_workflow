@@ -1,0 +1,16 @@
+审核当前三张图片并提出候选问题。严格返回：
+{
+  "candidates":[
+    {
+      "id":"A1",
+      "dimension":"face|pose|clothing|scene",
+      "issue":"具体问题名称",
+      "location":"生成图中的具体位置",
+      "visible_evidence":"实际可见现象及与对应参考图的差异",
+      "status":"suspected|uncertain"
+    }
+  ],
+  "summary":""
+}
+
+没有候选时返回空数组。不得输出候选以外的新字段，不得输出 Markdown。

@@ -6,3 +6,7 @@ dist/
 *.log
 coverage/
 .nyc_output/
+work/*.json
+work/*.html
+work/crop-experiment/
+work/named-detail-experiment/

@@ -1,6 +1,18 @@
+import { stat } from "node:fs/promises";
+import path from "node:path";
+
 import { closeWorkflowPage, delay, findWorkflowPageByUrl, js, openWorkflowPage, withCozePage } from "./coze-cdp.mjs";
 
-export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuseOpenPage = false }) {
+export async function runStringWorkflow({
+  url,
+  inputs,
+  files = {},
+  timeoutMs = 120000,
+  reuseOpenPage = false,
+  inputSettleMs = 3500,
+}) {
+  const normalizedFiles = normalizeWorkflowFiles(files);
+  await Promise.all(Object.values(normalizedFiles).map((filePath) => stat(filePath)));
   const page = reuseOpenPage ? await findWorkflowPageByUrl(url) : await openWorkflowPage(undefined, url);
   try {
     return await withCozePage(async ({ cdp, contextId }) => {
@@ -17,8 +29,10 @@ export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuse
       const openResult = await openTestRunPanel(cdp, contextId, evalInCoze);
       if (!openResult?.ok) return { ok: false, error: "test run panel unavailable", scrape: openResult };
 
+      const urlInputs = Object.fromEntries(Object.entries(inputs || {})
+        .filter(([fieldName]) => !normalizedFiles[fieldName]));
       const fillResult = await evalInCoze(`(async () => {
-        const inputs = ${js(inputs)};
+        const inputs = ${js(urlInputs)};
         const visible = (el) => {
           const r = el.getBoundingClientRect();
           const s = getComputedStyle(el);
@@ -112,8 +126,14 @@ export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuse
           bodyTail: (document.body.innerText || "").slice(-1000),
         };
       })()`);
-      const finalFillResult = fillResult?.ok ? fillResult : await fillInputsViaJsonMode(cdp, evalInCoze, inputs, fillResult);
+      const finalFillResult = fillResult?.ok ? fillResult : await fillInputsViaJsonMode(cdp, evalInCoze, urlInputs, fillResult);
       if (!finalFillResult?.ok) return { ok: false, error: "input fill failed", scrape: finalFillResult };
+      const uploadResult = await uploadWorkflowFiles(cdp, contextId, evalInCoze, normalizedFiles);
+      if (!uploadResult.ok) return { ok: false, error: "local file upload failed", scrape: uploadResult };
+
+      // URL image inputs can be accepted by the form before Coze finishes
+      // fetching them. Running immediately can make the model see no images.
+      if (inputSettleMs > 0) await delay(inputSettleMs);
 
       const beforeRun = await scrapeVisible(evalInCoze);
       const runClick = await evalInCoze(`(() => {
@@ -147,10 +167,10 @@ export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuse
         const latestResult = resultSignature(text);
         const resultChanged = latestResult && latestResult !== beforeResult;
         if ((text.includes("运行结果") || text.includes("运行成功")) && resultChanged) {
-          return { ok: true, scrape: latest, fillResult: finalFillResult };
+          return { ok: true, scrape: latest, fillResult: finalFillResult, uploadResult };
         }
         if (sawProgress && text.includes("运行成功") && latestResult && !beforeResult) {
-          return { ok: true, scrape: latest, fillResult: finalFillResult };
+          return { ok: true, scrape: latest, fillResult: finalFillResult, uploadResult };
         }
       }
       return { ok: false, error: "judge workflow timeout", scrape: { latest, beforeRun, fillResult: finalFillResult } };
@@ -158,6 +178,107 @@ export async function runStringWorkflow({ url, inputs, timeoutMs = 120000, reuse
   } finally {
     if (!reuseOpenPage) await closeWorkflowPage(page);
   }
+}
+
+export function normalizeWorkflowFiles(files = {}) {
+  return Object.fromEntries(Object.entries(files)
+    .filter(([, filePath]) => String(filePath || "").trim())
+    .map(([fieldName, filePath]) => {
+      const resolved = String(filePath);
+      if (!path.isAbsolute(resolved)) throw new TypeError(`workflow file must be absolute: ${fieldName}`);
+      return [fieldName, resolved];
+    }));
+}
+
+async function uploadWorkflowFiles(cdp, contextId, evalInCoze, files) {
+  const results = {};
+  for (const [fieldName, filePath] of Object.entries(files)) {
+    const modeResult = await evalInCoze(`(async () => {
+      const fieldName = ${js(fieldName)};
+      const visible = (el) => {
+        const r = el.getBoundingClientRect();
+        const s = getComputedStyle(el);
+        return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none";
+      };
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const findField = () => {
+        const label = Array.from(document.querySelectorAll("strong"))
+          .find((el) => (el.textContent || "").trim() === fieldName);
+        let node = label;
+        for (let level = 0; level < 10 && node; level += 1, node = node.parentElement) {
+          if (node.querySelector?.('input[type="file"]')) return node;
+          if (node.querySelector?.('[role="combobox"], .semi-select') && level >= 2) return node;
+        }
+        return null;
+      };
+      let field = findField();
+      if (!field) return { ok: false, reason: "missing field " + fieldName };
+      if (field.querySelector('input[type="file"]')) return { ok: true, already: true };
+      const select = Array.from(field.querySelectorAll('[role="combobox"], .semi-select')).find(visible);
+      if (!select) return { ok: false, reason: "missing upload mode selector " + fieldName };
+      select.click();
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        await wait(150);
+        const optionText = Array.from(document.querySelectorAll('[role="option"], .semi-select-option, .coz-select-option-item, .option-text'))
+          .filter(visible)
+          .find((el) => (el.innerText || el.textContent || "").trim() === "上传");
+        if (!optionText) continue;
+        const option = optionText.closest?.('[role="option"], .semi-select-option, .coz-select-option-item') || optionText;
+        option.click();
+        break;
+      }
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await wait(150);
+        field = findField();
+        if (field?.querySelector('input[type="file"]')) return { ok: true, selected: "上传" };
+      }
+      return { ok: false, reason: "upload input unavailable " + fieldName };
+    })()`);
+    if (!modeResult?.ok) return { ok: false, results, failedField: fieldName, modeResult };
+
+    const objectResult = await cdp.send("Runtime.evaluate", {
+      contextId,
+      returnByValue: false,
+      expression: `(() => {
+        const fieldName = ${js(fieldName)};
+        const label = Array.from(document.querySelectorAll("strong"))
+          .find((el) => (el.textContent || "").trim() === fieldName);
+        let node = label;
+        for (let level = 0; level < 10 && node; level += 1, node = node.parentElement) {
+          const input = node.querySelector?.('input[type="file"].semi-upload-hidden-input')
+            || node.querySelector?.('input[type="file"]');
+          if (input) return input;
+        }
+        return null;
+      })()`,
+    });
+    const objectId = objectResult.result?.objectId;
+    if (!objectId) return { ok: false, results, failedField: fieldName, reason: "file input object unavailable" };
+    const described = await cdp.send("DOM.describeNode", { objectId });
+    const backendNodeId = described.node?.backendNodeId;
+    if (!backendNodeId) return { ok: false, results, failedField: fieldName, reason: "file input backend node unavailable" };
+    await cdp.send("DOM.setFileInputFiles", { backendNodeId, files: [filePath] });
+
+    let uploaded = null;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await delay(250);
+      uploaded = await evalInCoze(`(() => {
+        const fieldName = ${js(fieldName)};
+        const label = Array.from(document.querySelectorAll("strong"))
+          .find((el) => (el.textContent || "").trim() === fieldName);
+        let node = label;
+        for (let level = 0; level < 10 && node; level += 1, node = node.parentElement) {
+          const input = node.querySelector?.('input[type="file"]');
+          if (input) return { fileName: input.files?.[0]?.name || "", text: (node.innerText || "").slice(0, 300) };
+        }
+        return null;
+      })()`);
+      if (uploaded?.fileName) break;
+    }
+    if (!uploaded?.fileName) return { ok: false, results, failedField: fieldName, reason: "file upload did not settle" };
+    results[fieldName] = { ok: true, fileName: uploaded.fileName, modeResult };
+  }
+  return { ok: true, results };
 }
 
 async function fillInputsViaJsonMode(cdp, evalInCoze, inputs, directFillResult) {

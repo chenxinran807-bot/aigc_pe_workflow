@@ -5,8 +5,20 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
+    "audit:collect": "node scripts/collect-audit-dataset.mjs",
+    "audit:split": "node scripts/split-audit-dataset.mjs",
+    "audit:run": "node scripts/run-audit-batch.mjs",
+    "audit:evaluate": "node scripts/evaluate-audit-results.mjs",
+    "audit:review-html": "node scripts/build-extra-review-html.mjs",
+    "audit:build-crops": "node scripts/build-audit-contact-sheets.mjs",
+    "audit:run-crops": "node scripts/run-audit-crop-experiment.mjs",
+    "audit:build-details": "node scripts/build-audit-detail-images.mjs",
+    "audit:run-details": "node scripts/run-audit-detail-experiment.mjs",
     "dev": "PORT=5246 HOST=127.0.0.1 node server.mjs",
     "start": "node server.mjs",
     "start:lan": "HOST=0.0.0.0 node server.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
   }
 }
